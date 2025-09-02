@@ -1,20 +1,25 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { initializeDatabase } from '../database/config';
 import WorkoutsScreen from '../screens/WorkoutsScreen';
 
 export default function App() {
+  const [dbReady, setDbReady] = useState(false);
+
   useEffect(() => {
-    const init = async () => {
+    const initDB = async () => {
       try {
         await initializeDatabase();
-        console.log('DB initialized successfully');
+        setDbReady(true);
       } catch (error) {
-        console.error('Failed to initialize DB:', error);
+        console.error('Failed to initialize database:', error);
       }
     };
     
-    init();
+    initDB();
   }, []);
 
+  if (!dbReady) {
+   // return <LoadingScreen />; // O algún loading
+  }
   return <WorkoutsScreen />;
 }

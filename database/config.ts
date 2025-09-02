@@ -6,9 +6,30 @@ const DATABASE_NAME = 'gym_trackerV1.db';
 // Instancia de la base de datos
 export const db = SQLite.openDatabaseSync(DATABASE_NAME);
 
+// Función para resetear completamente la base de datos (DESARROLLO SOLAMENTE)
+export const resetDatabase = async (): Promise<void> => {
+  try {
+    console.log('🗑️ Reseteando base de datos...');
+    
+    // Borrar todas las tablas
+    await db.execAsync('DROP TABLE IF EXISTS workout_exercises;');
+    await db.execAsync('DROP TABLE IF EXISTS workouts;');
+    await db.execAsync('DROP TABLE IF EXISTS exercises;');
+    await db.execAsync('DROP TABLE IF EXISTS muscle_groups;');
+    
+    console.log('✅ Tablas eliminadas correctamente');
+  } catch (error) {
+    console.error('❌ Error reseteando base de datos:', error);
+    throw error;
+  }
+};
+
 // Función para inicializar la base de datos
 export const initializeDatabase = async (): Promise<void> => {
   try {
+    // SOLO EN DESARROLLO: Descomentar la siguiente línea para resetear la DB
+    await resetDatabase();
+    
     // Verificar y crear las tablas base
     await createBaseTables();
     
@@ -18,9 +39,9 @@ export const initializeDatabase = async (): Promise<void> => {
     // Insertar datos iniciales
     await insertInitialData();
     
-    console.log('Base de datos inicializada correctamente');
+    console.log('✅ Base de datos inicializada correctamente');
   } catch (error) {
-    console.error('Error inicializando base de datos:', error);
+    console.error('❌ Error inicializando base de datos:', error);
     throw error;
   }
 };
@@ -59,51 +80,40 @@ const runMigrations = async (): Promise<void> => {
   `);
 
   if (!workoutsExists) {
-    // Crear tabla workouts desde cero
+    // Crear tabla workouts desde cero con estructura correcta
     await db.execAsync(`
       CREATE TABLE workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        muscle_group_id INTEGER NOT NULL,
         date TEXT NOT NULL,
         notes TEXT,
         is_completed BOOLEAN DEFAULT FALSE,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (muscle_group_id) REFERENCES muscle_groups (id)
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
   } else {
-    // Verificar si muscle_group_id existe en workouts
-    const columnExists = await db.getFirstAsync(`
-      PRAGMA table_info(workouts);
-    `);
-    
-    // Como PRAGMA devuelve múltiples filas, usamos getAllAsync
+    // Verificar estructura actual y migrar si es necesario
     const columns = await db.getAllAsync(`PRAGMA table_info(workouts);`);
-    const hasMuscleGroupId = columns.some((col: any) => col.name === 'muscle_group_id');
+    const columnNames = columns.map((col: any) => col.name);
     
-    if (!hasMuscleGroupId) {
-      // Migrar tabla workouts existente
-      console.log('Migrando tabla workouts...');
+    // Si tiene campos incorrectos (name, muscle_group_id), migrar
+    if (columnNames.includes('name') || columnNames.includes('muscle_group_id')) {
+      console.log('Migrando tabla workouts a estructura correcta...');
       
-      // Crear tabla temporal con nueva estructura
+      // Crear tabla temporal con estructura correcta
       await db.execAsync(`
         CREATE TABLE workouts_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          muscle_group_id INTEGER NOT NULL DEFAULT 1,
           date TEXT NOT NULL,
           notes TEXT,
           is_completed BOOLEAN DEFAULT FALSE,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (muscle_group_id) REFERENCES muscle_groups (id)
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
       
-      // Copiar datos existentes (asignar grupo muscular por defecto)
+      // Copiar solo los datos válidos
       await db.execAsync(`
-        INSERT INTO workouts_new (id, name, date, notes, is_completed, created_at)
-        SELECT id, name, date, notes, is_completed, created_at FROM workouts;
+        INSERT INTO workouts_new (id, date, notes, is_completed, created_at)
+        SELECT id, date, notes, is_completed, created_at FROM workouts;
       `);
       
       // Eliminar tabla antigua y renombrar
@@ -158,12 +168,12 @@ const insertInitialData = async (): Promise<void> => {
     ('Fondos en paralelas', 4, 'Dips para tríceps y pecho inferior')
   `);
 
-  // Insertar workouts de ejemplo
+  // Insertar workouts de ejemplo (solo fecha y notas)
   await db.execAsync(`
-    INSERT OR IGNORE INTO workouts (name, muscle_group_id, date, notes) VALUES 
-    ('Pecho Intenso', 1, '2025-08-23', 'Enfoque en fuerza'),
-    ('Espalda y Bíceps', 2, '2025-08-22', 'Volumen alto'),
-    ('Tríceps Focus', 4, '2025-08-21', 'Definición')
+    INSERT OR IGNORE INTO workouts (date, notes) VALUES 
+    ('2025-08-23', 'Entrenamiento de fuerza'),
+    ('2025-08-22', 'Volumen alto'),
+    ('2025-08-21', 'Definición muscular')
   `);
 
   // Insertar ejercicios de workout de ejemplo

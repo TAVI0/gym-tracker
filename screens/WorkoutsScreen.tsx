@@ -1,3 +1,4 @@
+import CreateWorkoutModal from '@/modals/CreateWorkoutModal';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -5,31 +6,24 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View
 } from 'react-native';
-import WorkoutsByGroup from '../components/WorkoutsByGroup';
-import { getAllWorkouts } from '../database/operations';
-import { MuscleGroup, WorkoutWithGroup } from '../types';
-
-interface GroupedWorkouts {
-  [groupName: string]: {
-    group: MuscleGroup;
-    workouts: WorkoutWithGroup[];
-  };
-}
+import WorkoutItem from '../components/WorkoutItem';
+import { getAllWorkouts, updateWorkoutCompletion } from '../database/operations';
+import { Workout } from '../types';
 
 const WorkoutsScreen: React.FC = () => {
-  const [workouts, setWorkouts] = useState<WorkoutWithGroup[]>([]);
-  const [groupedWorkouts, setGroupedWorkouts] = useState<GroupedWorkouts>({});
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const loadWorkouts = async () => {
     try {
       const result = await getAllWorkouts();
       if (result.success && result.data) {
         setWorkouts(result.data);
-        groupWorkoutsByMuscleGroup(result.data);
       } else {
         Alert.alert('Error', result.error || 'No se pudieron cargar los workouts');
       }
@@ -42,28 +36,43 @@ const WorkoutsScreen: React.FC = () => {
     }
   };
 
-  const groupWorkoutsByMuscleGroup = (workoutsList: WorkoutWithGroup[]) => {
-    const grouped: GroupedWorkouts = {};
-    
-    workoutsList.forEach(workout => {
-      const groupName = workout.group_name;
-      
-      if (!grouped[groupName]) {
-        grouped[groupName] = {
-          group: {
-            id: workout.muscle_group_id,
-            name: workout.group_name,
-            description: workout.group_description,
-            created_at: '' // No necesitamos esta fecha aquí
-          },
-          workouts: []
-        };
-      }
-      
-      grouped[groupName].workouts.push(workout);
-    });
+  const handleWorkoutToggle = async (workoutId: number, currentStatus: boolean) => {
+    try {
+      // Optimistic update
+      setWorkouts(prev =>
+        prev.map(w =>
+          w.id === workoutId
+            ? { ...w, is_completed: !currentStatus }
+            : w
+        )
+      );
 
-    setGroupedWorkouts(grouped);
+      // Update in database
+      const result = await updateWorkoutCompletion(workoutId, !currentStatus);
+      
+      if (!result.success) {
+        // Revert optimistic update on error
+        setWorkouts(prev =>
+          prev.map(w =>
+            w.id === workoutId
+              ? { ...w, is_completed: currentStatus }
+              : w
+          )
+        );
+        Alert.alert('Error', result.error || 'No se pudo actualizar el workout');
+      }
+    } catch (error) {
+      console.error('Error toggling workout:', error);
+      // Revert optimistic update
+      setWorkouts(prev =>
+        prev.map(w =>
+          w.id === workoutId
+            ? { ...w, is_completed: currentStatus }
+            : w
+        )
+      );
+      Alert.alert('Error', 'Error inesperado al actualizar el workout');
+    }
   };
 
   const onRefresh = () => {
@@ -86,7 +95,7 @@ const WorkoutsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mis Workouts</Text>
+        <Text style={styles.title}>Workouts</Text>
         <Text style={styles.subtitle}>
           {workouts.length} workout{workouts.length !== 1 ? 's' : ''} total
         </Text>
@@ -99,7 +108,7 @@ const WorkoutsScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {Object.keys(groupedWorkouts).length === 0 ? (
+        {workouts.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No hay workouts creados</Text>
             <Text style={styles.emptySubtext}>
@@ -107,21 +116,28 @@ const WorkoutsScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          Object.entries(groupedWorkouts).map(([groupName, { group, workouts: groupWorkouts }]) => (
-            <WorkoutsByGroup
-              key={groupName}
-              group={group}
-              workouts={groupWorkouts}
-              onWorkoutPress={(workout) => {
-                // TODO: Navegar a detalle del workout
-                console.log('Workout pressed:', workout.name);
-              }}
+          workouts.map((workout) => (
+            <WorkoutItem
+              key={workout.id}
+              workout={workout}
+              onToggle={handleWorkoutToggle}
             />
           ))
         )}
       </ScrollView>
 
-      {/* TODO: Agregar botón flotante para crear nuevo workout */}
+      <CreateWorkoutModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onCreated={loadWorkouts}
+      />
+
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -155,6 +171,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    padding: 16,
   },
   loadingText: {
     fontSize: 16,
@@ -179,6 +196,22 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#007bff',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+  fabText: {
+    fontSize: 30,
+    color: '#fff',
   },
 });
 

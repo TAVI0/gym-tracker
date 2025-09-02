@@ -2,41 +2,40 @@
 
 export interface MuscleGroup {
   id: number;
-  name: string;
+  name: string;// Ejemplo: "Pecho", "Espalda"
   description?: string;
   created_at: string;
 }
 
 export interface Exercise {
   id: number;
-  name: string;
-  muscle_group_id: number;
+  name: string;              // Ej: "Curl martillo"
+  muscle_group_id: number;   // FK -> MuscleGroup
   description?: string;
-  instructions?: string;
+  instructions?: string;     // Ej: "Mantener codo fijo"
   created_at: string;
 }
 
-export interface Workout {
+export interface Workout { // Representa la sesión de entrenamiento en una fecha.
   id: number;
-  name: string;
-  muscle_group_id: number;
-  date: string; // YYYY-MM-DD format
-  notes?: string;
+  date: string;         // YYYY-MM-DD
+  notes?: string;       // Ej: "Entrené de noche"
   is_completed: boolean;
   created_at: string;
 }
 
-export interface WorkoutExercise {
-  id: number;
-  workout_id: number;
-  exercise_id: number;
+export interface WorkoutExercise { // ejercicio realizado en un workout
+   id: number;
+  workout_id: number;    // FK -> Workout
+  exercise_id: number;   // FK -> Exercise
   is_completed: boolean;
-  sets?: number;
-  reps?: number;
-  weight?: number; // en kg
-  notes?: string;
+  sets?: number;         // Ej: 4
+  reps?: number;         // Ej: 12
+  weight?: number;       // Ej: 20 (kg)
+  notes?: string;        // Ej: "Última serie fallo"
   created_at: string;
 }
+
 // ===== TIPOS PARA CREACIÓN (sin id y created_at) =====
 
 export interface CreateMuscleGroup {
@@ -52,15 +51,15 @@ export interface CreateExercise {
 }
 
 export interface CreateWorkout {
-  name: string;
-  muscle_group_id: number;
-  date: string;
+  date: string;         // YYYY-MM-DD
   notes?: string;
+  is_completed?: boolean; // opcional, default = false
 }
 
 export interface CreateWorkoutExercise {
   workout_id: number;
   exercise_id: number;
+  is_completed?: boolean; // opcional, default = false
   sets?: number;
   reps?: number;
   weight?: number;
@@ -81,12 +80,6 @@ export interface ExerciseWithGroup extends Exercise {
   group_description?: string;
 }
 
-// Workout con información del grupo muscular
-export interface WorkoutWithGroup extends Workout {
-  group_name: string;
-  group_description?: string;
-}
-
 // WorkoutExercise con información del ejercicio
 export interface WorkoutExerciseWithDetails extends WorkoutExercise {
   exercise_name: string;
@@ -95,7 +88,7 @@ export interface WorkoutExerciseWithDetails extends WorkoutExercise {
 }
 
 // Workout completo con ejercicios
-export interface WorkoutComplete extends WorkoutWithGroup {
+export interface WorkoutComplete extends Workout {
   exercises: WorkoutExerciseWithDetails[];
   total_exercises: number;
   completed_exercises: number;
