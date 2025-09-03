@@ -80,11 +80,14 @@ export interface ExerciseWithGroup extends Exercise {
   group_description?: string;
 }
 
-// WorkoutExercise con información del ejercicio
+// WorkoutExercise con información del ejercicio y grupo muscular
 export interface WorkoutExerciseWithDetails extends WorkoutExercise {
   exercise_name: string;
   exercise_description?: string;
   exercise_instructions?: string;
+  muscle_group_id: number;
+  group_name: string;
+  group_description?: string;
 }
 
 // Workout completo con ejercicios

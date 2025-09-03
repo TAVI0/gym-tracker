@@ -10,8 +10,9 @@ export default function App() {
       try {
         await initializeDatabase();
         setDbReady(true);
+        console.log('✅ DB initialized successfully');
       } catch (error) {
-        console.error('Failed to initialize database:', error);
+        console.error('❌ Failed to initialize database:', error);
       }
     };
     
@@ -19,7 +20,8 @@ export default function App() {
   }, []);
 
   if (!dbReady) {
-   // return <LoadingScreen />; // O algún loading
+    return null; // No renderizar nada hasta que la DB esté lista
   }
+  
   return <WorkoutsScreen />;
 }

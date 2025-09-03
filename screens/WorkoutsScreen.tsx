@@ -1,4 +1,4 @@
-import CreateWorkoutModal from '@/modals/CreateWorkoutModal';
+//import CreateWorkoutModal from '@/modals/CreateWorkoutModal';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -12,12 +12,14 @@ import {
 import WorkoutItem from '../components/WorkoutItem';
 import { getAllWorkouts, updateWorkoutCompletion } from '../database/operations';
 import { Workout } from '../types';
+import WorkoutDetailScreen from './WorkoutDetailScreen';
 
 const WorkoutsScreen: React.FC = () => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<number | null>(null);
 
   const loadWorkouts = async () => {
     try {
@@ -34,6 +36,16 @@ const WorkoutsScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleWorkoutPress = (workout: Workout) => {
+    setSelectedWorkoutId(workout.id);
+  };
+
+  const handleBackToList = () => {
+    setSelectedWorkoutId(null);
+    // Refresh workouts when coming back from detail
+    loadWorkouts();
   };
 
   const handleWorkoutToggle = async (workoutId: number, currentStatus: boolean) => {
@@ -84,6 +96,16 @@ const WorkoutsScreen: React.FC = () => {
     loadWorkouts();
   }, []);
 
+  // Si hay un workout seleccionado, mostrar el detalle
+  if (selectedWorkoutId !== null) {
+    return (
+      <WorkoutDetailScreen
+        workoutId={selectedWorkoutId}
+        onBack={handleBackToList}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -116,21 +138,25 @@ const WorkoutsScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          workouts.map((workout) => (
-            <WorkoutItem
-              key={workout.id}
-              workout={workout}
-              onToggle={handleWorkoutToggle}
-            />
-          ))
+          <View style={styles.workoutsList}>
+            {workouts.map((workout) => (
+              <WorkoutItem
+                key={workout.id}
+                workout={workout}
+                onToggle={handleWorkoutToggle}
+                onPress={handleWorkoutPress}
+              />
+            ))}
+          </View>
         )}
       </ScrollView>
-
+{/*
       <CreateWorkoutModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onCreated={loadWorkouts}
       />
+*/}
 
       <TouchableOpacity 
         style={styles.fab}
@@ -212,6 +238,9 @@ const styles = StyleSheet.create({
   fabText: {
     fontSize: 30,
     color: '#fff',
+  },
+  workoutsList: {
+    gap: 12,
   },
 });
 

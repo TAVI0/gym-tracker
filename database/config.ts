@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 // Nombre de la base de datos
-const DATABASE_NAME = 'gym_trackerV1.db';
+const DATABASE_NAME = 'gym_trackerV2.db'; // Cambié el nombre para forzar nueva DB
 
 // Instancia de la base de datos
 export const db = SQLite.openDatabaseSync(DATABASE_NAME);
