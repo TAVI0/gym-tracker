@@ -96,3 +96,9 @@ export interface WorkoutComplete extends Workout {
   total_exercises: number;
   completed_exercises: number;
 }
+
+export interface WorkoutExerciseWithGroupDetails extends WorkoutExerciseWithDetails {
+  muscle_group_id: number;
+  muscle_group_name: string;
+  muscle_group_description: string;
+}

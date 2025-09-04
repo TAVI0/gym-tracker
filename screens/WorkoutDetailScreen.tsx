@@ -1,21 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import ExercisesByGroup from '../components/ExercisesByGroup';
-import { getWorkoutComplete, updateWorkoutExerciseCompletion } from '../database/operations';
-import { MuscleGroup, WorkoutComplete, WorkoutExerciseWithDetails } from '../types';
+import { getWorkout, getWorkoutExercisesWithGroupDetails, updateWorkoutExerciseCompletion } from '../database/operations';
+import { MuscleGroup, Workout, WorkoutExerciseWithGroupDetails } from '../types';
 
 interface GroupedExercises {
   [groupName: string]: {
     group: MuscleGroup;
-    exercises: WorkoutExerciseWithDetails[];
+    exercises: WorkoutExerciseWithGroupDetails[];
   };
 }
 
@@ -28,20 +28,31 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   workoutId, 
   onBack 
 }) => {
-  const [workoutComplete, setWorkoutComplete] = useState<WorkoutComplete | null>(null);
+  const [workout, setWorkout] = useState<Workout | null>(null);
+  const [exercises, setExercises] = useState<WorkoutExerciseWithGroupDetails[]>([]);
   const [groupedExercises, setGroupedExercises] = useState<GroupedExercises>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadWorkoutDetail = async () => {
     try {
-      const result = await getWorkoutComplete(workoutId);
-      if (result.success && result.data) {
-        setWorkoutComplete(result.data);
-        groupExercisesByMuscleGroup(result.data.exercises);
-      } else {
-        Alert.alert('Error', result.error || 'No se pudo cargar el workout');
+      // Cargar workout básico
+      const workoutResult = await getWorkout(workoutId);
+      if (!workoutResult.success || !workoutResult.data) {
+        Alert.alert('Error', workoutResult.error || 'No se pudo cargar el workout');
+        return;
       }
+
+      // Cargar ejercicios con detalles de grupo muscular
+      const exercisesResult = await getWorkoutExercisesWithGroupDetails(workoutId);
+      if (!exercisesResult.success || !exercisesResult.data) {
+        Alert.alert('Error', exercisesResult.error || 'No se pudieron cargar los ejercicios');
+        return;
+      }
+
+      setWorkout(workoutResult.data);
+      setExercises(exercisesResult.data);
+      groupExercisesByMuscleGroup(exercisesResult.data);
     } catch (error) {
       console.error('Error loading workout detail:', error);
       Alert.alert('Error', 'Error inesperado al cargar el workout');
@@ -51,23 +62,18 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     }
   };
 
-  const groupExercisesByMuscleGroup = async (exercises: WorkoutExerciseWithDetails[]) => {
-    // Necesitamos obtener la información del grupo muscular para cada ejercicio
-    // Como WorkoutExerciseWithDetails no incluye group info, necesitamos hacer otra consulta
+  const groupExercisesByMuscleGroup = (exercises: WorkoutExerciseWithGroupDetails[]) => {
     const grouped: GroupedExercises = {};
     
-    // Por ahora agrupamos por exercise_id y luego necesitaremos mejorar esto
-    // con una query que traiga también la info del grupo muscular
     exercises.forEach(exercise => {
-      // Temporal: usar exercise_name como grupo hasta que mejoremos la query
-      const groupKey = `Grupo ${exercise.exercise_id}`;
+      const groupKey = exercise.muscle_group_name;
       
       if (!grouped[groupKey]) {
         grouped[groupKey] = {
           group: {
-            id: exercise.exercise_id,
-            name: groupKey,
-            description: '',
+            id: exercise.muscle_group_id,
+            name: exercise.muscle_group_name,
+            description: exercise.muscle_group_description,
             created_at: ''
           },
           exercises: []
@@ -83,21 +89,14 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const handleExerciseToggle = async (exerciseId: number, currentStatus: boolean) => {
     try {
       // Optimistic update
-      if (workoutComplete) {
-        const updatedExercises = workoutComplete.exercises.map(ex =>
-          ex.id === exerciseId
-            ? { ...ex, is_completed: !currentStatus }
-            : ex
-        );
-        
-        setWorkoutComplete({
-          ...workoutComplete,
-          exercises: updatedExercises,
-          completed_exercises: updatedExercises.filter(ex => ex.is_completed).length
-        });
-        
-        groupExercisesByMuscleGroup(updatedExercises);
-      }
+      const updatedExercises = exercises.map(ex =>
+        ex.id === exerciseId
+          ? { ...ex, is_completed: !currentStatus }
+          : ex
+      );
+      
+      setExercises(updatedExercises);
+      groupExercisesByMuscleGroup(updatedExercises);
 
       // Update in database
       const result = await updateWorkoutExerciseCompletion(exerciseId, !currentStatus);
@@ -134,8 +133,9 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   };
 
   const getCompletionPercentage = (): number => {
-    if (!workoutComplete || workoutComplete.total_exercises === 0) return 0;
-    return Math.round((workoutComplete.completed_exercises / workoutComplete.total_exercises) * 100);
+    if (exercises.length === 0) return 0;
+    const completedCount = exercises.filter(ex => ex.is_completed).length;
+    return Math.round((completedCount / exercises.length) * 100);
   };
 
   useEffect(() => {
@@ -150,7 +150,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     );
   }
 
-  if (!workoutComplete) {
+  if (!workout) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>No se pudo cargar el workout</Text>
@@ -161,6 +161,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     );
   }
 
+  const completedCount = exercises.filter(ex => ex.is_completed).length;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -170,16 +172,16 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
         </TouchableOpacity>
         
         <View style={styles.headerInfo}>
-          <Text style={styles.dateTitle}>{formatDate(workoutComplete.date)}</Text>
-          {workoutComplete.notes && (
-            <Text style={styles.notesText}>{workoutComplete.notes}</Text>
+          <Text style={styles.dateTitle}>{formatDate(workout.date)}</Text>
+          {workout.notes && (
+            <Text style={styles.notesText}>{workout.notes}</Text>
           )}
         </View>
 
         {/* Progress indicator */}
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
-            {workoutComplete.completed_exercises}/{workoutComplete.total_exercises} ejercicios
+            {completedCount}/{exercises.length} ejercicios
           </Text>
           <View style={styles.progressBar}>
             <View 

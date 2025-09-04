@@ -10,7 +10,8 @@ import {
   Workout,
   WorkoutComplete,
   WorkoutExercise,
-  WorkoutExerciseWithDetails
+  WorkoutExerciseWithDetails,
+  WorkoutExerciseWithGroupDetails
 } from '../types';
 import { db } from './config';
 
@@ -397,6 +398,30 @@ export const deleteWorkoutExercise = async (id: number): Promise<DatabaseResult<
     return { success: true };
   } catch (error) {
     console.error('Error deleting workout exercise:', error);
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+export const getWorkoutExercisesWithGroupDetails = async (workoutId: number): Promise<DatabaseResult<WorkoutExerciseWithGroupDetails[]>> => {
+  try {
+    const result = await db.getAllAsync(`
+      SELECT 
+        we.*,
+        e.name as exercise_name,
+        e.description as exercise_description,
+        e.instructions as exercise_instructions,
+        mg.id as muscle_group_id,
+        mg.name as muscle_group_name,
+        mg.description as muscle_group_description
+      FROM workout_exercises we
+      INNER JOIN exercises e ON we.exercise_id = e.id
+      INNER JOIN muscle_groups mg ON e.muscle_group_id = mg.id
+      WHERE we.workout_id = ?
+      ORDER BY mg.name ASC, we.created_at ASC
+    `, [workoutId]);
+    return { success: true, data: result as WorkoutExerciseWithGroupDetails[] };
+  } catch (error) {
+    console.error('Error getting workout exercises with group details:', error);
     return { success: false, error: (error as Error).message };
   }
 };

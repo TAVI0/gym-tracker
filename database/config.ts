@@ -181,7 +181,7 @@ const insertInitialData = async (): Promise<void> => {
     INSERT OR IGNORE INTO workout_exercises (workout_id, exercise_id, sets, reps, weight, is_completed) VALUES 
     (1, 1, 4, 8, 80.0, true),
     (1, 2, 3, 10, 25.0, true),
-    (2, 3, 4, 6, 0, false),
+    (1, 1, 4, 6, 0, false),
     (2, 4, 3, 8, 60.0, true),
     (2, 5, 3, 12, 20.0, false),
     (3, 7, 4, 10, 40.0, true),
